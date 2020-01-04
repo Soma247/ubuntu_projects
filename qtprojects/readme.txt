@@ -1,0 +1,1 @@
+is qt dir
