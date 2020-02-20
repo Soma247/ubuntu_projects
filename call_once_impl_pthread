@@ -1,0 +1,36 @@
+  /// call_once
+  template<typename _Callable, typename... _Args>
+    void
+    call_once(once_flag& __once, _Callable&& __f, _Args&&... __args)
+    {
+      // _GLIBCXX_RESOLVE_LIB_DEFECTS
+      // 2442. call_once() shouldn't DECAY_COPY()
+      auto __callable = [&] {
+	  std::__invoke(std::forward<_Callable>(__f),
+			std::forward<_Args>(__args)...);
+      };
+#ifdef _GLIBCXX_HAVE_TLS
+      __once_callable = std::__addressof(__callable);
+      __once_call = []{ (*(decltype(__callable)*)__once_callable)(); };
+#else
+      unique_lock<mutex> __functor_lock(__get_once_mutex());
+      __once_functor = __callable;
+      __set_once_functor_lock_ptr(&__functor_lock);
+#endif
+
+      int __e = __gthread_once(&__once._M_once, &__once_proxy);
+
+#ifndef _GLIBCXX_HAVE_TLS
+      if (__functor_lock)
+        __set_once_functor_lock_ptr(0);
+#endif
+
+#ifdef __clang_analyzer__
+      // PR libstdc++/82481
+      __once_callable = nullptr;
+      __once_call = nullptr;
+#endif
+
+      if (__e)
+	      __throw_system_error(__e);
+    }
