@@ -1,6 +1,7 @@
 #include <iostream>
 #include <thread>
 #include <mutex>
+#include <atomic>
 
 std::once_flag flag2;
 
