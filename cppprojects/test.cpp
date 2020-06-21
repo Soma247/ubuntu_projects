@@ -35,4 +35,5 @@ int main(int argc, char* argv[]){
    thread_adv::jointhread tr(&print<std::string>,"abir"s);
    thread_adv::jointhread t2{std::move(tr)};
    return 0;
+
 }
