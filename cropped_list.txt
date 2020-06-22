@@ -25,6 +25,7 @@ openssl
 perl
 python
 python3
+screen
 sed
 spin
 tar
