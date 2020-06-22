@@ -1,0 +1,2 @@
+(grep -E -o '[[:alnum:][:punct:]]*' test.txt)> cropped_list.txt
+sudo apt-get remove $(cat cropped_list.txt)
