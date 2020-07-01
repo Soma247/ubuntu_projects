@@ -14,7 +14,6 @@
 #include <mutex>
 #include "include/threadsafe_stack.h"
 #include "include/jointhread.h"
-#include "include/once_init_binder.h"
 template<class U>
 struct thisTypeIs_;
 

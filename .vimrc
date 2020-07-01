@@ -1,3 +1,4 @@
+"  " Colors & User Interface
 set tabstop=3
 set shiftwidth=3
 set secure
@@ -10,7 +11,13 @@ set ai
 set cin
 set showmatch
 set colorcolumn=80
-highlight ColorColumn ctermbg=Black
+highlight ColorColumn ctermbg=DarkGrey
+highlight SpellBad term=standout ctermfg=0 ctermbg=11 guifg=Blue guibg=Yellow
+highlight LineNr ctermfg=DarkGrey guifg=Black
+highlight PreProc ctermfg=Green guifg=Green
+highlight Function ctermfg=Red guifg=Red
+highlight Comment ctermfg=0 guifg=#3eb489
+highlight Identifier term=underline cterm=bold ctermfg=Red guifg=Red
 set hlsearch
 set incsearch
 set ignorecase
@@ -20,7 +27,6 @@ set ffs=unix,dos,mac
 set clipboard=unnamedplus,unnamed
 set clipboard+=unnamed
 let g:ycm_global_ycm_extra_conf = '~/.vim/plugged/YouCompleteMe/.ycm_c-c++_conf.py' 
-highlight SpellBad term=standout ctermfg=0 ctermbg=11 guifg=Blue guibg=Yellow
 map <C-n> :NERDTreeToggle<CR>
 map <C-p> :YcmCompleter GetType<CR>
 call plug#begin('~/.vim/plugged')
