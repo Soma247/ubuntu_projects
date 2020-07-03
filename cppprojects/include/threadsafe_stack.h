@@ -6,6 +6,7 @@
 #include <stack>
 #include <chrono>
 #include <mutex>
+#include <condition_variable>
 namespace ts_adv{
    template<typename T, typename Container>
    class ts_stack{
@@ -46,10 +47,23 @@ namespace ts_adv{
          m_stack=std::move(rhs.stack_);
          return *this;
       }
+
       void pop_unprotected(value_type& ret){
          ret=std::move(m_stack.top());
          m_stack.pop();
       }
+
+      template <typename Oit, 
+         typename difference_type=
+            typename std::iterator_traits<Oit>::difference_type>
+      Oit pop_n_unprotected(Oit out, difference_type count){
+         for(;count;--count, ++out){
+            *out=std::move(m_stack.top());
+            m_stack.pop();
+         }
+         return out;
+      }
+
       pop_status try_pop_unprotected(value_type& ret){
          if(m_stack.empty())
             return pop_status::empty;
@@ -67,12 +81,22 @@ namespace ts_adv{
          std::lock_guard lg{m_mut};
          return try_pop_unprotected(ret);
       }
+
+      template <typename Oit, 
+         typename difference_type=
+            typename std::iterator_traits<Oit>::difference_type>
+      Oit pop_n(Oit out, difference_type count){
+         std::lock_guard ld{m_mut};
+         auto it=pop_n_unprotected(out,count);
+         return it;
+      }
+
       pop_status wait_and_pop(value_type& ret){
          std::unique_lock ul{m_mut};
          if(m_iterrupt_waits)
             return pop_status::iterrupted;
          m_cb.wait(ul,
-               [](){
+               [this](){
                   return !m_stack.empty()||
                   m_iterrupt_waits;
                }
@@ -83,15 +107,25 @@ namespace ts_adv{
          pop_unprotected(ret);
          return pop_status::ready;
       }
+      template <typename Oit, 
+         typename difference_type=
+            typename std::iterator_traits<Oit>::difference_type>
+      Oit wait_and_pop_n(Oit out, difference_type count){
+         std::unique_lock ul{m_mut};
+         auto it=pop_n_unprotected(out,count);
+         return it;
+      }
+
+
       template<typename Rep, typename Period>
-      pop_status wait_and_pop_for(value_type& ret,
+      pop_status wait_for_and_pop(value_type& ret,
             const std::chrono::duration<Rep, Period>& dur)
       {
          std::unique_lock ul{m_mut};
          if(m_iterrupt_waits)
             return pop_status::iterrupted;
-         bool status = m_cb.wait_for(ul,
-                           [](){
+         bool status = m_cb.wait_for(ul, dur,
+                           [this](){
                               return !m_stack.empty||
                               m_iterrupt_waits;
                            });
@@ -104,14 +138,14 @@ namespace ts_adv{
          return pop_status::ready;
       }
       template<typename Clock, typename Dur>
-      pop_status wait_and_pop_until(value_type& ret,
-            const std::chrono::timepoint<Clock, Dur>& tp)
+      pop_status wait_until_and_pop(value_type& ret,
+            const std::chrono::time_point<Clock, Dur>& tp)
       {
          std::unique_lock ul{m_mut};
          if(m_iterrupt_waits)
             return pop_status::iterrupted;
-         bool status = m_cb.wait_until(ul,
-                           [](){
+         bool status = m_cb.wait_until(ul, tp,
+                           [this](){
                               return !m_stack.empty||
                               m_iterrupt_waits;
                            });
@@ -123,7 +157,12 @@ namespace ts_adv{
          pop_unprotected(ret);
          return pop_status::ready;
       }
-
+      void notify_one(){
+         m_cb.notify_one();
+      }
+      void notify_all(){
+         m_cb.notify_all();
+      }
       void stop_waitings(){
          std::lock_guard lg{m_mut};
          m_iterrupt_waits=true;
@@ -141,6 +180,52 @@ namespace ts_adv{
       void push(value_type&& val){
          std::lock_guard lg{m_mut};
          m_stack.push(std::move(val));
+      }
+      template<typename...Args>
+      void emplace_and_notify_one(Args&&...args){
+         emplace(std::forward<Args>(args)...);
+         m_cb.notify_one();
+      }
+      void push_and_notify_one(const value_type& val){
+         push(val);
+         m_cb.notify_one();
+      }
+      void push_and_notify_one(value_type&& val){
+         push(std::move(val));
+         m_cb.notify_one();
+      }
+      template<typename...Args>
+      void emplace_and_notify_all(Args&&...args){
+         emplace(std::forward<Args>(args)...);
+         m_cb.notify_all();
+      }
+      void push_and_notify_all(const value_type& val){
+         push(val);
+         m_cb.notify_all();
+      }
+      void push_and_notify_all(value_type&& val){
+         push(std::move(val));
+         m_cb.notify_all();
+      }
+      template<typename InIt>
+      void push_range_unprotected(InIt beg, InIt end){
+         for(;beg!=end;++beg)
+            m_stack.push(*beg);
+      }
+      template<typename InIt>
+      void push_range(InIt beg, InIt end){
+         std::lock_guard lg{m_mut};
+         push_n_unprotected(beg,end);
+      }
+      template<typename InIt>
+      void push_range_and_notify_one(InIt beg, InIt end){
+         push_n(beg, end);
+         m_cb.notify_one();
+      }
+      template<typename InIt>
+      void push_range_and_notify_all(InIt beg, InIt end){
+         push_n(beg, end);
+         m_cb.notify_all();
       }
       bool empty()const{
          std::lock_guard lg{m_mut};
