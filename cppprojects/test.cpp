@@ -25,10 +25,11 @@ template<typename T>
 decltype(auto) thisTypeIs(T){
   return thisTypeIs_<T>{};
 };
-std::mutex s_mutcout;
+
 template<typename T>
 void print(T&& t){
    using namespace std::chrono_literals;
+   static std::mutex s_mutcout{};
    std::lock_guard lg{s_mutcout};
    std::cout<<std::forward<T>(t)<<std::endl;
 }
@@ -92,34 +93,43 @@ int main(int argc, char* argv[]){
       std::condition_variable cv;
       std::mutex mut;
       bool start{false};
-
+      std::atomic<bool> stop{false};
       ts_adv::ts_stack<int> ts{};
       auto range={1,2,3,4,5,6,7};
-      thread_adv::jointhread tpush ([&cv,&mut,&start,&ts,&range](){
+      thread_adv::jointhread tpush ([&stop,&cv,&mut,&start,&ts,&range](){
             std::random_device rd{};
             std::default_random_engine der{rd()};
             std::unique_lock ul{mut};
             cv.wait(ul,[&start](){return start;});
+            ul.unlock();
             for(auto it=range.begin();it!=range.end();++it){
-               std::this_thread::sleep_for(der()%1000 *1ms);
+               std::this_thread::sleep_for(milliseconds(der()%1000));
                ts.push_and_notify_one(*it);
+               print("push "s+std::to_string(*it));
             }
+            stop=true;
       });
-      auto popper=[&cv,&mut,&start,&ts](int i){
+      auto popper=[&stop,&cv,&mut,&start,&ts](int i){
          std::random_device rd{};
          std::default_random_engine der{rd()};
          std::unique_lock ul{mut};
          cv.wait(ul,[&start](){return start;});
+         ul.unlock();
          int val;
          //does not wait any, if can't pop now
-         while(ts.wait_and_pop(val)==decltype(ts)::pop_status::ready){
-            print(std::to_string(i)+" "s+std::to_string(val));
-            std::this_thread::sleep_for(milliseconds(der()%30));
-         }
+         do{
+            if(ts.wait_and_pop(val)==decltype(ts)::pop_status::ready){
+               print("pop"s+std::to_string(i)+" "s+std::to_string(val));
+               std::this_thread::sleep_for(milliseconds(der()%30));
+            }
+            if(ts.empty()&&stop.load()){
+               ts.stop_waitings();
+               return;
+            }
+         }while(true);
       };
       thread_adv::jointhread tpop1(popper,1);
       thread_adv::jointhread tpop2(popper,2);
-      ts.stop_waitings();
       std::lock_guard lg{mut};
       start=true;
       cv.notify_all();
