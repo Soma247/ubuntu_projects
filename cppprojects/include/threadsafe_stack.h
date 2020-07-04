@@ -8,8 +8,8 @@
 #include <mutex>
 #include <condition_variable>
 namespace ts_adv{
-   template<typename T, typename Container>
-   class ts_stack{
+   template<typename T, typename Container=std::deque<T>>
+   class ts_stack final{
       using stack_type=std::stack<T,Container>;
       using value_type=typename stack_type::value_type;
 
@@ -26,6 +26,9 @@ namespace ts_adv{
    public:
       enum class pop_status:char{empty, ready,
          try_lock_fail, iterrupted, timeout};
+      
+      ts_stack():m_mut{},m_cb{},
+         m_iterrupt_waits{false},m_stack{}{}
 
       template<typename Arg, typename...Args,
          typename=std::enable_if<!std::is_same_v<ts_stack,Arg>>>
@@ -53,22 +56,26 @@ namespace ts_adv{
          m_stack.pop();
       }
 
-      template <typename Oit, 
-         typename difference_type=
-            typename std::iterator_traits<Oit>::difference_type>
-      Oit pop_n_unprotected(Oit out, difference_type count){
-         for(;count;--count, ++out){
-            *out=std::move(m_stack.top());
-            m_stack.pop();
-         }
-         return out;
-      }
-
       pop_status try_pop_unprotected(value_type& ret){
          if(m_stack.empty())
             return pop_status::empty;
          pop_unprotected(ret);
          return pop_status::ready;
+      }
+
+      template <typename Oit, 
+         typename difference_type=
+            typename std::iterator_traits<Oit>::difference_type>
+      Oit pop_n_unprotected(Oit out, difference_type count){
+         while(count){
+            if(m_stack.empty())
+               return out;
+            *out=std::move(m_stack.top());
+            m_stack.pop();
+            ++out;
+            --count;
+         }
+         return out;
       }
 
       pop_status try_lock_and_pop(value_type& ret){
@@ -77,6 +84,7 @@ namespace ts_adv{
             return pop_status::try_lock_fail;
          return try_pop_unprotected(ret);
       }
+
       pop_status pop(value_type& ret){
          std::lock_guard lg{m_mut};
          return try_pop_unprotected(ret);
@@ -87,8 +95,7 @@ namespace ts_adv{
             typename std::iterator_traits<Oit>::difference_type>
       Oit pop_n(Oit out, difference_type count){
          std::lock_guard ld{m_mut};
-         auto it=pop_n_unprotected(out,count);
-         return it;
+         return pop_n_unprotected(out,count);
       }
 
       pop_status wait_and_pop(value_type& ret){
@@ -98,7 +105,7 @@ namespace ts_adv{
          m_cb.wait(ul,
                [this](){
                   return !m_stack.empty()||
-                  m_iterrupt_waits;
+                     m_iterrupt_waits;
                }
          );
          if(m_iterrupt_waits)
@@ -107,13 +114,21 @@ namespace ts_adv{
          pop_unprotected(ret);
          return pop_status::ready;
       }
+
       template <typename Oit, 
          typename difference_type=
             typename std::iterator_traits<Oit>::difference_type>
       Oit wait_and_pop_n(Oit out, difference_type count){
          std::unique_lock ul{m_mut};
-         auto it=pop_n_unprotected(out,count);
-         return it;
+         if(m_iterrupt_waits)return out;
+         m_cb.wait(ul,
+               [this](){
+                  return !m_stack.empty() ||
+                     m_iterrupt_waits;
+               });
+         if(m_iterrupt_waits)return out;
+         //stack isn't empty here
+         return pop_n_unprotected(out,count);
       }
 
 
@@ -137,6 +152,29 @@ namespace ts_adv{
          pop_unprotected(ret);
          return pop_status::ready;
       }
+
+      template <typename Rep, typename Period, typename Oit, 
+         typename difference_type=
+            typename std::iterator_traits<Oit>::difference_type>
+      std::pair<Oit,pop_status> 
+      wait_for_and_pop_n(Oit out, 
+            const std::chrono::duration<Rep, Period>& dur,
+            difference_type count)
+      {
+         std::unique_lock ul{m_mut};
+         if(m_iterrupt_waits)return {out,pop_status::iterrupted};
+         bool status=m_cb.wait_for(ul,dur,
+               [this](){
+                  return !m_stack.empty() ||
+                     m_iterrupt_waits;
+               });
+         if(!status)
+            return {out,pop_status::timeout};
+         if(m_iterrupt_waits)return {out, pop_status::iterrupted};
+         //stack isn't empty here
+         return {pop_n_unprotected(out,count),pop_status::ready};
+      }
+
       template<typename Clock, typename Dur>
       pop_status wait_until_and_pop(value_type& ret,
             const std::chrono::time_point<Clock, Dur>& tp)
@@ -157,6 +195,31 @@ namespace ts_adv{
          pop_unprotected(ret);
          return pop_status::ready;
       }
+
+      template <typename Clock, typename Dur, typename Oit, 
+         typename difference_type=
+            typename std::iterator_traits<Oit>::difference_type>
+      std::pair<Oit,pop_status> 
+      wait_until_and_pop_n(Oit out, 
+            std::chrono::time_point<Clock,Dur> tp,
+                             difference_type count)
+      {
+         std::unique_lock ul{m_mut};
+         if(m_iterrupt_waits)return {out,pop_status::iterrupted};
+         bool status=m_cb.wait_until(ul,tp,
+               [this](){
+                  return !m_stack.empty() ||
+                     m_iterrupt_waits;
+               });
+         if(!status)
+            return {out,pop_status::timeout};
+         if(m_iterrupt_waits)return {out, pop_status::iterrupted};
+         //stack isn't empty here
+         return {pop_n_unprotected(out,count),pop_status::ready};
+      }
+
+
+
       void notify_one(){
          m_cb.notify_one();
       }
@@ -215,16 +278,16 @@ namespace ts_adv{
       template<typename InIt>
       void push_range(InIt beg, InIt end){
          std::lock_guard lg{m_mut};
-         push_n_unprotected(beg,end);
+         push_range_unprotected(beg,end);
       }
       template<typename InIt>
       void push_range_and_notify_one(InIt beg, InIt end){
-         push_n(beg, end);
+         push_range(beg, end);
          m_cb.notify_one();
       }
       template<typename InIt>
       void push_range_and_notify_all(InIt beg, InIt end){
-         push_n(beg, end);
+         push_range(beg, end);
          m_cb.notify_all();
       }
       bool empty()const{
