@@ -21,24 +21,24 @@ namespace ts_adv{
 
       mutable std::mutex m_mut;
       std::condition_variable m_cb;
-      bool m_iterrupt_waits;
+      bool m_interrupt_waiting;
       stack_type m_stack;
    public:
       enum class pop_status:char{empty, ready,
-         try_lock_fail, iterrupted, timeout};
+         try_lock_fail, interrupted, timeout};
       
       ts_stack():m_mut{},m_cb{},
-         m_iterrupt_waits{false},m_stack{}{}
+         m_interrupt_waiting{false},m_stack{}{}
 
       template<typename Arg, typename...Args,
          typename=std::enable_if<!std::is_same_v<ts_stack,Arg>>>
       ts_stack(Arg&& arg, Args&&...args):
-         m_mut{},m_cb{},m_iterrupt_waits{false},
+         m_mut{},m_cb{},m_interrupt_waiting{false},
          m_stack(std::forward<Arg>(arg),std::forward<Args>(args)...){}
 
       ts_stack(const ts_stack&)=delete;
       ts_stack(ts_stack&& rhs):m_mut{}, m_cb{},
-         m_iterrupt_waits{false}
+         m_interrupt_waiting{false}
       {    
          std::lock_guard lg{rhs.m_mut};
          m_stack=std::move(rhs.m_stack);
@@ -100,16 +100,16 @@ namespace ts_adv{
 
       pop_status wait_and_pop(value_type& ret){
          std::unique_lock ul{m_mut};
-         if(m_iterrupt_waits)
-            return pop_status::iterrupted;
+         if(m_interrupt_waiting)
+            return pop_status::interrupted;
          m_cb.wait(ul,
                [this](){
                   return !m_stack.empty()||
-                     m_iterrupt_waits;
+                     m_interrupt_waiting;
                }
          );
-         if(m_iterrupt_waits)
-            return pop_status::iterrupted;
+         if(m_interrupt_waiting)
+            return pop_status::interrupted;
          //stack isn't empty here
          pop_unprotected(ret);
          return pop_status::ready;
@@ -120,13 +120,13 @@ namespace ts_adv{
             typename std::iterator_traits<Oit>::difference_type>
       Oit wait_and_pop_n(Oit out, difference_type count){
          std::unique_lock ul{m_mut};
-         if(m_iterrupt_waits)return out;
+         if(m_interrupt_waiting)return out;
          m_cb.wait(ul,
                [this](){
                   return !m_stack.empty() ||
-                     m_iterrupt_waits;
+                     m_interrupt_waiting;
                });
-         if(m_iterrupt_waits)return out;
+         if(m_interrupt_waiting)return out;
          //stack isn't empty here
          return pop_n_unprotected(out,count);
       }
@@ -137,17 +137,17 @@ namespace ts_adv{
             const std::chrono::duration<Rep, Period>& dur)
       {
          std::unique_lock ul{m_mut};
-         if(m_iterrupt_waits)
-            return pop_status::iterrupted;
+         if(m_interrupt_waiting)
+            return pop_status::interrupted;
          bool status = m_cb.wait_for(ul, dur,
                            [this](){
                               return !m_stack.empty||
-                              m_iterrupt_waits;
+                              m_interrupt_waiting;
                            });
          if(!status)
             return pop_status::timeout;
-         if(m_iterrupt_waits)
-            return pop_status::iterrupted;
+         if(m_interrupt_waiting)
+            return pop_status::interrupted;
          //stack isn't empty here!!!
          pop_unprotected(ret);
          return pop_status::ready;
@@ -162,15 +162,15 @@ namespace ts_adv{
             difference_type count)
       {
          std::unique_lock ul{m_mut};
-         if(m_iterrupt_waits)return {out,pop_status::iterrupted};
+         if(m_interrupt_waiting)return {out,pop_status::interrupted};
          bool status=m_cb.wait_for(ul,dur,
                [this](){
                   return !m_stack.empty() ||
-                     m_iterrupt_waits;
+                     m_interrupt_waiting;
                });
          if(!status)
             return {out,pop_status::timeout};
-         if(m_iterrupt_waits)return {out, pop_status::iterrupted};
+         if(m_interrupt_waiting)return {out, pop_status::interrupted};
          //stack isn't empty here
          return {pop_n_unprotected(out,count),pop_status::ready};
       }
@@ -180,17 +180,17 @@ namespace ts_adv{
             const std::chrono::time_point<Clock, Dur>& tp)
       {
          std::unique_lock ul{m_mut};
-         if(m_iterrupt_waits)
-            return pop_status::iterrupted;
+         if(m_interrupt_waiting)
+            return pop_status::interrupted;
          bool status = m_cb.wait_until(ul, tp,
                            [this](){
                               return !m_stack.empty||
-                              m_iterrupt_waits;
+                              m_interrupt_waiting;
                            });
          if(!status)
             return pop_status::timeout;
-         if(m_iterrupt_waits)
-            return pop_status::iterrupted;
+         if(m_interrupt_waiting)
+            return pop_status::interrupted;
          //stack isn't empty here!!!
          pop_unprotected(ret);
          return pop_status::ready;
@@ -205,15 +205,15 @@ namespace ts_adv{
                              difference_type count)
       {
          std::unique_lock ul{m_mut};
-         if(m_iterrupt_waits)return {out,pop_status::iterrupted};
+         if(m_interrupt_waiting)return {out,pop_status::interrupted};
          bool status=m_cb.wait_until(ul,tp,
                [this](){
                   return !m_stack.empty() ||
-                     m_iterrupt_waits;
+                     m_interrupt_waiting;
                });
          if(!status)
             return {out,pop_status::timeout};
-         if(m_iterrupt_waits)return {out, pop_status::iterrupted};
+         if(m_interrupt_waiting)return {out, pop_status::interrupted};
          //stack isn't empty here
          return {pop_n_unprotected(out,count),pop_status::ready};
       }
@@ -228,7 +228,7 @@ namespace ts_adv{
       }
       void stop_waitings(){
          std::lock_guard lg{m_mut};
-         m_iterrupt_waits=true;
+         m_interrupt_waiting=true;
          m_cb.notify_all();
       }
       template<typename...Args>
