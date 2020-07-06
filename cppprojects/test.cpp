@@ -14,6 +14,7 @@
 #include <limits>
 #include <mutex>
 #include "include/threadsafe_stack.h"
+#include "include/threadsafe_queue.h"
 #include "include/jointhread.h"
 #include <iterator>
 #include <algorithm>
