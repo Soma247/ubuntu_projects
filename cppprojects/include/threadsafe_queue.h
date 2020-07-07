@@ -39,7 +39,12 @@ namespace ts_adv{
                alloc_traits::destruct(
                      s_alloc, get_data_addr());
          }
-
+         void* operator new(std::size_t sz){
+            return alloc_traits::allocate(sz);
+         }
+         void operator delete(void* ptr, std::size_t sz){
+            alloc_traits::deallocate(ptr, sz);
+         }
          T* get_data_addr(){
             return static_cast<T*>(&m_storage);
          }
