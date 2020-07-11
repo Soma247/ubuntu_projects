@@ -14,7 +14,7 @@ namespace ts_adv{
       class Alloc=
          std::allocator<std::pair<const Key,T>> 
    >
-   class ts_hashmap{
+   class ts_hashmap final{
    public:
       using key_type = Key;
       using mapped_type = T;
@@ -46,7 +46,7 @@ namespace ts_adv{
          iterator find_entry(const key_type& k){
             return std::find_if(std::begin(m_data),std::end(m_data),
                      [&k](const bucket_value& v)->bool{
-                        return key_equal(v.first, k);
+                        return key_equal{}(v.first, k);
                      }); 
          }
 
@@ -54,7 +54,7 @@ namespace ts_adv{
          const_iterator find_entry(const key_type& k)const{
             return std::find_if(std::cbegin(m_data),std::cend(m_data),
                      [&k](const bucket_value& v)->bool{
-                        return key_equal(v.first, k);
+                        return key_equal{}(v.first, k);
                      }); 
          }
       public:
@@ -131,32 +131,34 @@ namespace ts_adv{
             return false;
          }
 
-         size_type remove(const key_type& k){
+         void remove(const key_type& k){
             std::lock_guard lg{m_mut};
-            return m_data.remove_if([&k](const bucket_value& val){
-                              return key_equal(val.first,k);
+            m_data.remove_if([&k](const bucket_value& val){
+                              return key_equal{}(val.first,k);
                               });
          } 
          template<typename Pred>
-         size_type remove_if(Pred p){
+         void remove_if(Pred p){
             std::lock_guard lg{m_mut};
-            return m_data.remove_if(p);
+            m_data.remove_if(p);
          }
       };//bucket_type
 
       const size_type m_buckets_count;
       std::vector<bucket_type> m_buckets;
-      
+      const hasher m_hasher;
+
       constexpr bucket_type& bucket_for(const key_type& key)const{
-         return m_buckets[hasher(key)];
+         return m_buckets[m_hasher(key)%m_buckets_count];
       }
       bucket_type& bucket_for(const key_type& key){
-         return m_buckets[hasher(key)];
+         return m_buckets[m_hasher(key)%m_buckets_count];
       }
    public:
          ts_hashmap(size_type buckets_count):
             m_buckets_count{buckets_count},
-            m_buckets(m_buckets_count){}
+            m_buckets(m_buckets_count),
+            m_hasher{}{}
          
          size_type buckets_count()const{
             return m_buckets_count;
@@ -185,13 +187,13 @@ namespace ts_adv{
          template<typename M>
          bool insert(const key_type& k, M&& obj){
             return bucket_for(k).insert(k,
-                              std::forward<M>(obj);
+                              std::forward<M>(obj));
          }
 
          template<typename M>
          bool insert(key_type&& k, M&& obj){
             return bucket_for(k).insert(std::move(k),
-                                       std::forward<M>(obj);
+                                       std::forward<M>(obj));
 
          }
 
@@ -199,18 +201,16 @@ namespace ts_adv{
             return bucket_for(k).value_for(k);
          }
 
-         size_type remove(const key_type& k){
-            return bucket_for(k).remove(k);
+         void remove(const key_type& k){
+            bucket_for(k).remove(k);
          }
 
          template<typename Pred>
-         size_type remove_if(Pred&& p){
-            size_type count{0};
+         void remove_if(Pred&& p){
             std::for_each(std::begin(m_buckets),std::end(m_buckets),
-               [&count,pred=std::forward<Pred>(p)](bucket_type& b){
-                  count+=b.remove_if(pred);
+               [pred=std::forward<Pred>(p)](bucket_type& b){
+                  b.remove_if(pred);
             });
-            return count;
          }
    };
 }//ts_adv
