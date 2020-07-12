@@ -15,6 +15,7 @@
 #include <mutex>
 #include "include/threadsafe_stack.h"
 #include "include/threadsafe_queue.h"
+#include "include/threadsafe_hashmap.h"
 #include "include/jointhread.h"
 #include <iterator>
 #include <algorithm>
@@ -35,6 +36,10 @@ void print(T&& t){
    std::cout<<std::forward<T>(t)<<std::endl;
 }
 
+std::ostream& operator<< (std::ostream& os, std::pair<int,int> p){
+   os<<'{'<<p.first<<','<<p.second<<'}'<<std::endl;
+   return os;
+}
 
 
 int main(int argc, char* argv[]){
@@ -43,6 +48,41 @@ int main(int argc, char* argv[]){
    using namespace std::chrono;
    using namespace std::chrono_literals;
 //   thisTypeIs(der);
+   {
+      ts_adv::ts_hashmap<int,int> hm(100);
+      std::vector<int> vint{};
+      for(auto i{0};i<1000;++i)
+         vint.push_back(i);
+
+      auto pusher=[&hm,&vint](int i){
+         print("insert from:"+std::to_string(i));
+         for(auto i:vint)
+            hm.insert(i,i);
+      };
+      auto pusher2=[&hm,&vint](int i){
+         print("insert from:"+std::to_string(i));
+         for(auto i:vint)
+            hm.insert(i,i);
+      };
+      auto popper=[&hm,&vint](){
+         for(auto i:vint)
+            if(i%21)
+               hm.remove(i);
+      };
+      {
+         thread_adv::jointhread t1(pusher,1),
+            t2(pusher2,2), t3(popper);
+      }
+      std::vector<std::pair<int,int>> vint2;
+      hm.copy(std::back_inserter(vint2));
+      {
+         thread_adv::jointhread t1(popper);
+      }
+      std::cout<<"_________________"<<std::endl;
+      for(auto&p:vint2)
+         std::cout<<p.first<<' '<<p.second<<std::endl;
+
+   }
    {
       std::cout<<"first"<<std::endl;
       ts_adv::ts_stack<int> tstack{};
@@ -134,8 +174,20 @@ int main(int argc, char* argv[]){
       std::lock_guard lg{mut};
       start=true;
       cv.notify_all();
-   }
-
+         }
+      struct str{
+         int i;
+         str(int ii):i{ii}{}
+         void* operator new(std::size_t sz){
+            print("oper new");
+            return ::operator new(sz);
+         }
+         void operator delete(void* ptr, std::size_t sz){
+            print("op del"s+std::to_string(sz));
+            ::operator delete(ptr);
+         }
+      };
+   auto ptr{std::make_unique<str>(3)};
    return 0;
 
 }

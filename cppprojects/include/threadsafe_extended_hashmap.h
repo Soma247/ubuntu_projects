@@ -83,8 +83,7 @@ namespace ts_adv{
                if(key_equal{}(it->first,k))
                      return b_it;
             }
-            return end;
-         }
+            return end; }
 
          [[nodiscard]]
          const_iterator find_before_entry(const key_type& k)const{
@@ -196,7 +195,6 @@ namespace ts_adv{
       const hasher m_hasher;
       size_type m_buckets_count;
       double m_load_factor;
-      std::atomic<size_type> m_size;
       std::vector<bucket_type> m_buckets;
 
       constexpr bucket_type& bucket_for(const key_type& key)const{
@@ -212,7 +210,6 @@ namespace ts_adv{
             m_hasher{},
             m_buckets_count{buckets_count},
             m_load_factor{load_factor},
-            m_size{0},
             m_buckets(m_buckets_count){}
             
          
@@ -220,6 +217,7 @@ namespace ts_adv{
             std::shared_lock sl{m_mut};
             return m_buckets_count;
          }
+
          size_type size()const{
             size_type sz{0};
             std::shared_lock sl{m_mut};
@@ -227,6 +225,7 @@ namespace ts_adv{
                sz+=b.size();
             return sz;
          }
+         
          template<typename Oit>
          Oit copy(Oit out)const{
             std::shared_lock sl{m_mut};
@@ -243,6 +242,7 @@ namespace ts_adv{
             bucket_for(k).insert_or_assign(k,
                               std::forward<M>(obj));
          }
+
          template<typename M>
          void insert_or_assign(key_type&& k, M&& obj){
             std::shared_lock sl{m_mut};
@@ -278,22 +278,27 @@ namespace ts_adv{
          void rehash(double load_factor=0.7f){
             size_type sz{0};
             std::lock_guard lg{m_mut};
+            //get count of pairs
             for(auto& b:m_buckets)
                sz+=b.size_unprotected();
-
-            std::vector<bucket_type> tmp{
-               static_cast<size_type>(sz/load_factor)};
-            for(auto&b:m_buckets){
+            sz=static_cast<size_type>(sz/load_factor);
+            //create temporary "buckets"
+            std::vector<bucket_type> tmp(sz);
+            //move all nodes from old buckets to tmp
+            for(auto& b : m_buckets){
                auto& old_data=b.m_data;
-                  while(old_data.begin()!=old_data.end()){
-                     size_type num=hasher(old_data.front().first)%sz;
-                     auto& new_data=tmp[num].m_data;
-                     new_data.splice_after(new_data.before_begin(),
-                        old_data,old_data.begin());
-                     ++b.m_size;
+
+               while(old_data.begin()!=old_data.end()){
+                  size_type bucket_num=m_hasher(old_data.front().first) % sz;
+                  auto& new_data=tmp[bucket_num].m_data;
+                  //move node from data of bucket b to data in new bucket
+                  new_data.splice_after(new_data.cbefore_begin(),
+                        old_data,old_data.cbefore_begin());
+                  ++new_data.m_size;
                }
             }
             using std::swap;
+            //swap old buckets and new buckets
             swap(tmp,m_buckets);
          }
    };
