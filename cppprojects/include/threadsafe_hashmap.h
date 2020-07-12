@@ -79,10 +79,12 @@ namespace ts_adv{
          }
 
          [[nodiscard]]
-         std::optional<mapped_type> value_for(const key_type& k)const{
+         std::optional<mapped_type> mapped_for(const key_type& k)const{
             std::shared_lock sl{m_mut};
             auto cit=find_entry(k);
-            if(cit!=std::cend(m_data))return cit->second;
+            if(cit!=std::cend(m_data))
+               return cit->second;
+            return {};
          }
          
          template<typename M>
@@ -137,18 +139,13 @@ namespace ts_adv{
                               return key_equal{}(val.first,k);
                               });
          } 
-         template<typename Pred>
-         void remove_if(Pred p){
-            std::lock_guard lg{m_mut};
-            m_data.remove_if(p);
-         }
       };//bucket_type
 
       const size_type m_buckets_count;
       std::vector<bucket_type> m_buckets;
       const hasher m_hasher;
 
-      constexpr bucket_type& bucket_for(const key_type& key)const{
+      constexpr const bucket_type& bucket_for(const key_type& key)const{
          return m_buckets[m_hasher(key)%m_buckets_count];
       }
       bucket_type& bucket_for(const key_type& key){
@@ -197,20 +194,12 @@ namespace ts_adv{
 
          }
 
-         std::optional<mapped_type> value_for(const key_type& k)const{
-            return bucket_for(k).value_for(k);
+         std::optional<mapped_type> mapped_for(const key_type& k)const{
+            return bucket_for(k).mapped_for(k);
          }
 
          void remove(const key_type& k){
             bucket_for(k).remove(k);
-         }
-
-         template<typename Pred>
-         void remove_if(Pred&& p){
-            std::for_each(std::begin(m_buckets),std::end(m_buckets),
-               [pred=std::forward<Pred>(p)](bucket_type& b){
-                  b.remove_if(pred);
-            });
          }
    };
 }//ts_adv

@@ -31,18 +31,19 @@ namespace ts_adv{
          typename std::allocator_traits<allocator_type>::const_pointer;
       using size_type = std::size_t;
       using difference_type = std::ptrdiff_t;
+      using bucket_value = std::pair<key_type, mapped_type>;
+      using list_type = std::forward_list<value_type,allocator_type>;
+      using iterator = typename list_type::iterator;
+      using const_iterator = typename list_type::const_iterator;
+
    private:
 
       struct bucket_type{
-      public:
-         using bucket_value = std::pair<key_type, mapped_type>;
-         using list_type = std::forward_list<value_type,allocator_type>;
-         using iterator = typename list_type::iterator;
-         using const_iterator = typename list_type::const_iterator;
+         //data
          mutable std::shared_mutex m_mut;
          list_type m_data;
          size_type m_size;
-
+         //ctors
          bucket_type():m_mut{},m_data{},m_size{}{}
          bucket_type(const bucket_type&)=delete;
          bucket_type(bucket_type&& other){
@@ -50,14 +51,17 @@ namespace ts_adv{
             m_data=std::move(other.m_data);
             m_size=std::move(other.m_size);
          }
+         //assignment operators
          bucket_type& operator = (const bucket_type&)=delete;
          bucket_type& operator = (bucket_type&& other){
             std::scoped_lock sl(m_mut, other.m_mut);
             m_data=std::move(other.m_data);
             m_size=std::move(other.m_size);
          }
+         //dtor
          ~bucket_type()=default;
-         
+
+         //find value_type and return iterator to it or end of m_data
          [[nodiscard]]
          iterator find_entry(const key_type& k){
             return std::find_if(std::begin(m_data),std::end(m_data),
@@ -73,7 +77,8 @@ namespace ts_adv{
                         return key_equal{}(v.first, k);
                      }); 
          }
-
+         //find value_type and return iterator to element, 
+         //preferred it or end of m_data
          [[nodiscard]]
          iterator find_before_entry(const key_type& k){
             iterator b_it=m_data.before_begin(),
@@ -96,23 +101,28 @@ namespace ts_adv{
             }
             return cend;
          }
-
+         
+         //copy all value_types from m_data to output iterator
          template<typename Oit>
          Oit copy_values(Oit out)const{
             std::shared_lock sl{m_mut};
             return std::copy(std::cbegin(m_data),
                            std::cend(m_data),out);
          }
+
+         //return copy of mapped_type for element, if it exist
          [[nodiscard]]
-         std::optional<mapped_type> value_for_unprotected(const key_type& k)const{
+         std::optional<mapped_type> mapped_for_unprotected(const key_type& k)const{
             auto cit=find_entry(k);
-            if(cit!=std::cend(m_data))return cit->second;
+            if(cit!=std::cend(m_data))
+               return cit->second;
+            return {};
          }
  
          [[nodiscard]]
-         std::optional<mapped_type> value_for(const key_type& k)const{
+         std::optional<mapped_type> mapped_for(const key_type& k)const{
             std::shared_lock sl{m_mut};
-            return value_for_unprotected(k);
+            return mapped_for_unprotected(k);
          }
          
          template<typename M>
@@ -197,9 +207,10 @@ namespace ts_adv{
       double m_load_factor;
       std::vector<bucket_type> m_buckets;
 
-      constexpr bucket_type& bucket_for(const key_type& key)const{
+      constexpr const bucket_type& bucket_for(const key_type& key)const{
          return m_buckets[m_hasher(key)%m_buckets_count];
       }
+
       bucket_type& bucket_for(const key_type& key){
          return m_buckets[m_hasher(key)%m_buckets_count];
       }
@@ -264,9 +275,9 @@ namespace ts_adv{
                                        std::forward<M>(obj));
          }
 
-         std::optional<mapped_type> value_for(const key_type& k)const{
+         std::optional<mapped_type> mapped_for(const key_type& k)const{
             std::shared_lock sl{m_mut};
-            return bucket_for(k).value_for(k);
+            return bucket_for(k).mapped_for(k);
          }
 
 
