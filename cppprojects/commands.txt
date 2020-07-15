@@ -1,0 +1,13 @@
+:!clear && clang++ 
+   test.cpp //list of files or adr/*
+   -fsanitize=thread //thread sanitizer
+   --std=c++17 //standard 
+   -stdlib=libc++ //use llvm libc++
+   -lc++abi //for llvm
+   -lpthread //use pthread lib in linux
+   -Wall 
+   -mcx16 //use DCAS
+   -o //generate object file
+   test.o //name of file
+&& ./test.o
+

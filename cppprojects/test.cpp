@@ -16,10 +16,12 @@
 #include "include/threadsafe_stack.h"
 #include "include/threadsafe_queue.h"
 #include "include/threadsafe_hashmap.h"
+#include "include/threadsafe_extended_hashmap.h"
 #include "include/jointhread.h"
 #include <iterator>
 #include <algorithm>
 #include <random>
+#include <atomic>
 template<class U>
 struct thisTypeIs_;
 
@@ -48,6 +50,17 @@ int main(int argc, char* argv[]){
    using namespace std::chrono;
    using namespace std::chrono_literals;
 //   thisTypeIs(der);
+   struct abir{
+      long long f;
+      long long s;
+      abir(){}
+      abir(int a, int b):f{a},s{b}{}
+   };
+   std::atomic<abir> abr({1,1});
+   abir abr2(1,1),abr3(3,3);
+   abr.compare_exchange_strong(abr2,abr3);
+   std::cout<<abr.load().f<<' '<<abr.load().s<<std::endl;
+   std::cout<<"is lock_free:"<<boolalpha<<abr.is_lock_free()<<std::endl;
    {
       ts_adv::ts_hashmap<int,int> hm(100);
       std::vector<int> vint{};
@@ -81,7 +94,12 @@ int main(int argc, char* argv[]){
       std::cout<<"_________________"<<std::endl;
       for(auto&p:vint2)
          std::cout<<p.first<<' '<<p.second<<std::endl;
-
+      std::cout<<"***********************"<<std::endl;
+      for(int i=0;i<1000;++i){
+         auto t=hm.mapped_for(i);
+         std::cout<<(t?std::to_string(t.value())+"\n"s:""s);
+      }
+      std::cout<<std::endl;
    }
    {
       std::cout<<"first"<<std::endl;
