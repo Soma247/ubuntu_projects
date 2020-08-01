@@ -9,15 +9,12 @@
 namespace thread_adv{
    
    template<
-      typename RetType,
       template<typename T> class AllocTemplate=std::allocator
    >
    class basic_thread_pool final{
-      using ret_type = RetType;
-      using task_type = std::packaged_task<ret_type()>;
       class ptask_wrapper{
          struct impl_base{
-            virtual ret_type operator()()=0;
+            virtual void operator()()=0;
             virtual ~impl_base(){}
          };
 
@@ -26,26 +23,29 @@ namespace thread_adv{
          struct impl:public impl_base{
             Callable m_callable;
             explicit impl(Callable&& c):m_callable{std::move(c)}{}
-            ret_type operator()()override{
+            void operator()()override{
                return m_callable();
             }
          };
 
          std::unique_ptr<impl_base> m_pimpl;
       public:
-         ptask_wrapper(task_type&& pt):m_pimpl{new task_type(std::move(pt))}{}
-         ptask_wrapper& operator = (task_type&& other){
+         template<typename T>
+         ptask_wrapper(std::packaged_task<T()>&& pt):
+            m_pimpl{new std::packaged_task<T()>(std::move(pt))}{}
+         
+         ptask_wrapper(ptask_wrapper&& other):
+            m_pimpl{std::move(other.m_pimpl)}{}
+         ptask_wrapper(const ptask_wrapper&)=delete;
+
+         ptask_wrapper& operator = (ptask_wrapper&& other){
             m_pimpl=std::move(other.m_pimpl);
             return *this;
          }
-         ret_type operator()()override{
-            return (*m_pimpl)();
+         void operator()(){
+            (*m_pimpl)();
          }
-         ptask_wrapper(const task_type&)=delete;
-         ptask_wrapper& operator = (const task_type&)=delete;
-         task_type& get(){
-            return *m_pimpl.get();
-         }
+         
          ~ptask_wrapper(){}
       };
       using allocator_type = AllocTemplate<ptask_wrapper>;
@@ -63,26 +63,25 @@ namespace thread_adv{
          template<typename...A>
             inner_queue_type(A&&...args):m_queue(std::forward<A>(args)...){}
 
-         template<typename...A>
-         void push(task_type&& task){
+         void push(ptask_wrapper&& task){
             std::lock_guard lg{m_mut};
             m_queue.push_back(std::move(task));
          }
-
-         bool try_pop(task_type& task){
+         
+         bool try_pop(ptask_wrapper& task){
             std::lock_guard lg{m_mut};
             if(m_queue.empty())
                return false;
-            task=std::move(m_queue.front().get());
+            task=std::move(m_queue.front());
             m_queue.pop_front();
             return true;
          }
-
-         bool try_steal(task_type& task){
+         
+         bool try_steal(ptask_wrapper& task){
             std::lock_guard lg{m_mut};
             if(m_queue.empty())
                return false;
-            task=std::move(m_queue.back().get());
+            task=std::move(m_queue.back());
             return true;
          };
 
@@ -111,7 +110,7 @@ namespace thread_adv{
          tl_p_inner_queue = &m_inner_queues[index];
       }
 
-      bool try_steal_task(task_type& task, std::size_t index){
+      bool try_steal_task(ptask_wrapper& task, std::size_t index){
          std::size_t sz=m_inner_queues.size();
          for(std::size_t i=0;i<sz;++i){
                if(m_inner_queues[(index+i+1) % sz]
@@ -120,7 +119,7 @@ namespace thread_adv{
          }
          return false;
       }
-      bool try_take_task(task_type& task, std::size_t index){
+      bool try_take_task(ptask_wrapper& task, std::size_t index){
          return (tl_p_inner_queue && 
                  tl_p_inner_queue->try_pop(task))||
                  m_queue.pop(task)||
@@ -129,7 +128,7 @@ namespace thread_adv{
       void thread_worker(std::size_t index){
          try{
             this->init_p_inner_queue(index);
-            task_type current_task{};
+            ptask_wrapper current_task{};
             while(!m_stopped.load(std::memory_order_relaxed)){
                if(try_take_task(current_task, index))
                   current_task();
@@ -160,16 +159,15 @@ namespace thread_adv{
       basic_thread_pool& operator = (basic_thread_pool&&)=delete;
       void stop(){m_stopped.store(true,std::memory_order_relaxed);}
       ~basic_thread_pool(){stop();}
-      
-      std::future<ret_type> assign_task(task_type&& task){
-         std::future<ret_type> ret=task.get_future();
+     
+      template<typename Ret>
+      std::future<Ret> assign_task(std::packaged_task<Ret()>&& task){
+         std::future<Ret> ret=task.get_future();
          m_queue.push(new ptask_wrapper{std::move(task)});
          return ret;
       }
    private:
      };//basic_thread_pool
-   template<typename R>
-   using thread_pool = basic_thread_pool<R,std::allocator>;
-   using simple_thread_pool = thread_pool<void>;
+   using thread_pool = basic_thread_pool<std::allocator>;
 }//namespace thread_adv
 #endif//THREADPOOL_H
