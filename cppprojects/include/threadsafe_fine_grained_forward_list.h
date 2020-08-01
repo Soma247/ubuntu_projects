@@ -41,7 +41,7 @@ namespace ts_adv{
          }
       }
       
-      void push_node_front(std::unique_ptr new_beg){
+      void push_node_front(std::unique_ptr<node_type> new_beg){
          std::lock_guard lg{m_before_begin->m_mut};
          new_beg.m_next=std::move(m_before_begin->m_text);
          m_before_begin->m_next=std::move(new_beg);
@@ -73,10 +73,10 @@ namespace ts_adv{
       tfg_flist& operator = (tfg_flist&&)=delete;
 
       void push_front(const value_type& val){
-         this->push_node_front(std::make_unique<node>(val));
+         this->push_node_front(std::make_unique<node_type>(val));
       }
       void push_front(value_type&& val){
-         this->push_node_front(std::make_unique<node>(std::move(val)));
+         this->push_node_front(std::make_unique<node_type>(std::move(val)));
       }
 
       template<typename UnOp>
@@ -143,7 +143,7 @@ namespace ts_adv{
             std::unique_lock cur_lock{cur_cptr->m_mut};
             if(p(cur_cptr->m_pdata)){
                //move current node outside a list, unlock it and delete
-               std::unique_ptr<node> tmp{std::move(prev_cptr->m_next)};
+               std::unique_ptr<node_type> tmp{std::move(prev_cptr->m_next)};
                prev_cptr->m_next=std::move(tmp->m_next);
                cur_lock.unlock();
             }
