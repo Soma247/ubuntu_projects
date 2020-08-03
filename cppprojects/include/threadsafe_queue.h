@@ -1,5 +1,3 @@
-//make exception-safe with construct/destruct
-//use allocate
 #ifndef THREADSAFE_QUEUE_H
 #define THREADSAFE_QUEUE_H
 #include <type_traits>
@@ -10,13 +8,11 @@
 #include <condition_variable>
 #include <memory>
 namespace ts_adv{
-   template<typename T, typename Allocator=std::allocator<T>>
+   template<typename T, typename ThreadSafeAlloc=std::allocator<T>>
    class ts_queue final{
    public:
       using value_type=T;
-      using allocator_type=Allocator;
-      using alloc_traits=std::allocator_traits<allocator_type>;
-   
+         
       class empty_queue_error:public std::out_of_range{
          template<typename Msg>
          empty_queue_error(Msg&& msg):
@@ -26,9 +22,11 @@ namespace ts_adv{
       enum class pop_status:char{empty, ready,
          try_lock_fail, interrupted, timeout};
    private:
-      static allocator_type s_alloc{};
-
       struct node{
+         /*using node_allocator_type = 
+            typename alloc_traits::rebind_alloc<node>;
+         using node_alloc_traits = 
+            typename alloc_traits::rebind_traits<node>;*/
          std::aligned_storage<sizeof(T),alignof(T)> m_storage;
          std::unique_ptr<node> m_next;
          bool initialized;
@@ -36,17 +34,17 @@ namespace ts_adv{
          node():m_storage{}, m_next{}, initialized{false}{}
          ~node(){
             if(initialized)
-               alloc_traits::destruct(
+               alloc_traits::destroy(
                      s_alloc, get_data_addr());
          }
          void* operator new(std::size_t sz){
-            return alloc_traits::allocate(sz);
+            return alloc_traits::allocate(s_alloc, sz);
          }
-         void operator delete(void* ptr, std::size_t sz){
-            alloc_traits::deallocate(ptr, sz);
+         void operator delete(void* ptr, std::size_t sz){ 
+            alloc_traits::deallocate(s_alloc, static_cast<node*>(ptr), sz);
          }
          T* get_data_addr(){
-            return static_cast<T*>(&m_storage);
+            return reinterpret_cast<T*>(&m_storage);
          }
          
          template<typename...Args>
@@ -62,8 +60,13 @@ namespace ts_adv{
          }
          node& operator=(const node&)=delete;
          node& operator=(node&&)=delete;
-      };
-      
+      };//node
+      using allocator_type=
+         typename std::allocator_traits<ThreadSafeAlloc>::
+                                            template rebind_alloc<node>;
+      using alloc_traits=std::allocator_traits<allocator_type>;
+
+      static allocator_type s_alloc;
       mutable std::mutex m_head_mut;
       mutable std::mutex m_tail_mut;
       std::condition_variable m_cb;
@@ -73,7 +76,7 @@ namespace ts_adv{
 
       void clear_unprotected(){
          while(m_head.get()!=m_tail){
-            m_head=std::move(m_head->next);//destruct in reset with data
+            m_head=std::move(m_head->m_next);//destruct in reset with data
          }
       }
       void clear(){
@@ -86,14 +89,14 @@ namespace ts_adv{
       }
       
       void pop_unptotected_unchecked(value_type& ret){
-         ret=std::move(m_head->get_data_ref());//move item from head
-         m_head=std::move(m_head->next);
+         ret=std::move(*m_head->get_data_addr());//move item from head
+         m_head=std::move(m_head->m_next);
       }
       
       pop_status pop_unprotected(value_type& ret,
             node* possible_tail)
       {
-         if(m_head.get==possible_tail)
+         if(m_head.get()==possible_tail)
             return pop_status::empty;
          this->pop_unptotected_unchecked(ret);
          return pop_status::ready;
@@ -305,7 +308,7 @@ namespace ts_adv{
          std::lock_guard lg{m_tail_mut};
          m_tail->construct_data(std::forward<Args>(args)...);
          m_tail->m_next=std::move(pnew_tail);
-         m_tail=m_tail->next.get();
+         m_tail=m_tail->m_next.get();
       }
       
       void push(const value_type& val){
@@ -377,6 +380,8 @@ namespace ts_adv{
          return m_head.get()==m_tail;
       }
    };
+   template<typename T, typename A>
+   inline typename ts_queue<T,A>::allocator_type ts_queue<T,A>::s_alloc{};
 
 }
 

@@ -18,10 +18,12 @@
 #include "include/threadsafe_hashmap.h"
 #include "include/threadsafe_extended_hashmap.h"
 #include "include/jointhread.h"
+#include "include/threadpool.h"
 #include <iterator>
 #include <algorithm>
 #include <random>
 #include <atomic>
+#include <sstream>
 template<class U>
 struct thisTypeIs_;
 
@@ -43,6 +45,24 @@ std::ostream& operator<< (std::ostream& os, std::pair<int,int> p){
    return os;
 }
 
+std::atomic<int> count{0};
+void f1(thread_adv::thread_pool& tp){ 
+      std::stringstream strstr{};
+      strstr<<count.fetch_add(1)
+         <<" thread id = "<<std::this_thread::get_id()
+         <<std::endl;
+      print(strstr.str());
+      if(count.load()<10000){
+         std::packaged_task<void()> pt([&tp](){f1(tp);});
+         auto fut=tp.assign_task(std::move(pt));
+         if(fut.wait_for(std::chrono::milliseconds(0))==
+                  std::future_status::deferred)fut.wait();
+         else 
+            while(fut.wait_for(std::chrono::milliseconds(0))!=
+               std::future_status::ready)
+            tp.try_work();
+      }
+}
 
 int main(int argc, char* argv[]){
    using namespace std;
@@ -50,6 +70,7 @@ int main(int argc, char* argv[]){
    using namespace std::chrono;
    using namespace std::chrono_literals;
 //   thisTypeIs(der);
+try{
    struct abir{
       long long f;
       long long s;
@@ -59,8 +80,43 @@ int main(int argc, char* argv[]){
    std::atomic<abir> abr({1,1});
    abir abr2(1,1),abr3(3,3);
    abr.compare_exchange_strong(abr2,abr3);
-   std::cout<<abr.load().f<<' '<<abr.load().s<<std::endl;
+   std::cout<<abr.load().f<<'a'<<abr.load().s<<std::endl;
    std::cout<<"is lock_free:"<<boolalpha<<abr.is_lock_free()<<std::endl;
+   { 
+      std::cout<<"start pool"<<std::endl;
+      thread_adv::thread_pool tp{};
+      std::packaged_task<void()> pt([&tp](){f1(tp);});
+      auto fut= tp.assign_task(std::move(pt));
+      std::this_thread::sleep_for(std::chrono::seconds(1)); 
+      fut.wait();
+   }/*
+   {std::cout<<"end pool"<<std::endl;
+      std::vector<int> vint{};
+      for(auto i{0};i<1000;++i)
+         vint.push_back(i);
+
+
+      ts_adv::ts_queue<int> queue{};
+      auto pusher=[&queue,&vint](int i){
+         print("insert from:"+std::to_string(i));
+         for(auto i:vint)
+            queue.push(i);
+      };
+      auto pusher2=[&queue,&vint](int i){
+         print("insert from:"+std::to_string(i));
+         for(auto i:vint)
+            queue.push(i);
+      };
+      auto popper=[&queue,&vint](){
+         int ii;
+         for(std::size_t i=0;i<vint.size();++i)
+               if(queue.pop(ii)==ts_adv::ts_queue<int>::pop_status::ready)
+                  print(std::to_string(ii));
+      };
+      thread_adv::jointhread t1(pusher,1),
+            t2(pusher2,2), t3(popper);
+
+   }
    {
       ts_adv::ts_hashmap<int,int> hm(100);
       std::vector<int> vint{};
@@ -205,7 +261,10 @@ int main(int argc, char* argv[]){
             ::operator delete(ptr);
          }
       };
-   auto ptr{std::make_unique<str>(3)};
+   auto ptr{std::make_unique<str>(3)};*/
+}catch(std::exception& e){
+   print(e.what());
+}
    return 0;
 
 }
