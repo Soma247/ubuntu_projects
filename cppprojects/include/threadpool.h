@@ -15,7 +15,7 @@ namespace thread_adv{
       class ptask_wrapper{
          struct impl_base{
             virtual void call()=0;
-            virtual ~impl_base(){}
+            virtual ~impl_base()=default;
          };
 
          //void ret and R ret
@@ -30,11 +30,11 @@ namespace thread_adv{
 
          std::unique_ptr<impl_base> m_pimpl;
       public:
-         ptask_wrapper(){}
+         ptask_wrapper()=default;
 
          template<typename T>
-         ptask_wrapper(std::packaged_task<T()>&& pt):
-         m_pimpl{std::make_unique<impl<decltype(pt)>>(std::move(pt))}{}
+         explicit ptask_wrapper(std::packaged_task<T()>&& pt):
+            m_pimpl{new impl<decltype(pt)>(std::move(pt))}{}
          
          ptask_wrapper(ptask_wrapper&& other)=default;
          ptask_wrapper(const ptask_wrapper&)=delete;
@@ -161,7 +161,9 @@ namespace thread_adv{
       basic_thread_pool(basic_thread_pool&&)=delete;
       basic_thread_pool& operator = (const basic_thread_pool&)=delete;
       basic_thread_pool& operator = (basic_thread_pool&&)=delete;
-      void stop(){m_stopped.store(true,std::memory_order_relaxed);}
+      void stop(){
+         m_stopped.store(true,std::memory_order_relaxed);
+      }
       ~basic_thread_pool(){stop();}
 
       void try_work(){
@@ -182,8 +184,7 @@ namespace thread_adv{
          }
          return ret;
       }
-   private:
-     };//basic_thread_pool
+   };//basic_thread_pool
    template<template<class>class alloc>
    inline thread_local size_t basic_thread_pool<alloc>::tl_thread_index{};
 

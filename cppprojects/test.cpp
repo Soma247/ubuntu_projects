@@ -47,6 +47,7 @@ std::ostream& operator<< (std::ostream& os, std::pair<int,int> p){
 
 std::atomic<int> count{0};
 void f1(thread_adv::thread_pool& tp){ 
+   using namespace std::chrono_literals;
       std::stringstream strstr{};
       strstr<<count.fetch_add(1)
          <<" thread id = "<<std::this_thread::get_id()
@@ -55,11 +56,8 @@ void f1(thread_adv::thread_pool& tp){
       if(count.load()<10000){
          std::packaged_task<void()> pt([&tp](){f1(tp);});
          auto fut=tp.assign_task(std::move(pt));
-         if(fut.wait_for(std::chrono::milliseconds(0))==
-                  std::future_status::deferred)fut.wait();
-         else 
-            while(fut.wait_for(std::chrono::milliseconds(0))!=
-               std::future_status::ready)
+         f1(tp);
+         while(fut.wait_for(0ms)!=std::future_status::ready)
             tp.try_work();
       }
 }
