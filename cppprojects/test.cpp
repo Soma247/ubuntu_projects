@@ -24,6 +24,7 @@
 #include <random>
 #include <atomic>
 #include <sstream>
+#include <map>
 template<class U>
 struct thisTypeIs_;
 
@@ -46,20 +47,24 @@ std::ostream& operator<< (std::ostream& os, std::pair<int,int> p){
 }
 
 std::atomic<int> count{0};
+std::mutex map_mut{};
+std::map<std::string,int> tmap{};
+
 void f1(thread_adv::thread_pool& tp){ 
    using namespace std::chrono_literals;
-      std::stringstream strstr{};
-      strstr<<count.fetch_add(1)
-         <<" thread id = "<<std::this_thread::get_id()
-         <<std::endl;
-      print(strstr.str());
-      if(count.load()<10000){
-         std::packaged_task<void()> pt([&tp](){f1(tp);});
-         auto fut=tp.assign_task(std::move(pt));
-         f1(tp);
-         while(fut.wait_for(0ms)!=std::future_status::ready)
-            tp.try_work();
-      }
+   if(count.fetch_add(1,std::memory_order_relaxed)>40000){
+      return;
+   }
+   std::stringstream sstr{};
+   sstr<<std::this_thread::get_id();
+   {std::lock_guard lg{map_mut};
+      ++tmap[sstr.str()];
+   }
+   std::packaged_task<void()> pt([&tp](){f1(tp);});
+   auto fut=tp.assign_task(std::move(pt));
+   f1(tp);
+   while(fut.wait_for(0ms)!=std::future_status::ready)
+      tp.try_work();
 }
 
 int main(int argc, char* argv[]){
@@ -85,9 +90,10 @@ try{
       thread_adv::thread_pool tp{};
       std::packaged_task<void()> pt([&tp](){f1(tp);});
       auto fut= tp.assign_task(std::move(pt));
-      std::this_thread::sleep_for(std::chrono::seconds(1)); 
       fut.wait();
-   }/*
+   }
+   for(auto&p:tmap)
+      std::cout<<p.first<<" - "<<p.second<<std::endl;
    {std::cout<<"end pool"<<std::endl;
       std::vector<int> vint{};
       for(auto i{0};i<1000;++i)
@@ -259,7 +265,7 @@ try{
             ::operator delete(ptr);
          }
       };
-   auto ptr{std::make_unique<str>(3)};*/
+   auto ptr{std::make_unique<str>(3)};
 }catch(std::exception& e){
    print(e.what());
 }
