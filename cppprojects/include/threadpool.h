@@ -101,7 +101,7 @@ namespace thread_adv{
       };//inner_queue_type
 
       thread_local static inner_queue_type* tl_p_inner_queue;
-      thread_local static std::size_t tl_thread_index;
+      thread_local static std::ptrdiff_t tl_thread_index;
       ts_adv::ts_queue<ptask_wrapper,allocator_type> m_queue;
       std::atomic<bool> m_stopped;
       std::vector<inner_queue_type> m_inner_queues;
@@ -140,7 +140,8 @@ namespace thread_adv{
             }
          }
          catch(...){
-           stop();
+           stop();//stop execution new tasks (someday)
+           throw;//terminate to prevent undefined behavior
          }
       }
 
@@ -186,7 +187,8 @@ namespace thread_adv{
       }
    };//basic_thread_pool
    template<template<class>class alloc>
-   inline thread_local size_t basic_thread_pool<alloc>::tl_thread_index{};
+   inline thread_local 
+   std::ptrdiff_t basic_thread_pool<alloc>::tl_thread_index{-1};
 
    template<template<class>class alloc>
    inline thread_local 
