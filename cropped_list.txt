@@ -6,12 +6,12 @@ git-man
 graphviz
 grep
 libboost-all-dev
-libc++-dev:amd64
 libc++abi-dev
 libgmp-dev
 libicu-dev
 libc++-dev
 lldb
+libgtest-dev
 llvm
 llvm-dev
 llvm-runtime
