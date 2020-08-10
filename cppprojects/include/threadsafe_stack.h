@@ -143,7 +143,7 @@ namespace ts_adv{
             return pop_status::interrupted;
          bool status = m_cb.wait_for(ul, dur,
                            [this](){
-                              return !m_stack.empty||
+                              return !m_stack.empty()||
                               m_interrupt_waiting;
                            });
          if(!status)
@@ -159,9 +159,8 @@ namespace ts_adv{
          typename difference_type=
             typename std::iterator_traits<Oit>::difference_type>
       std::pair<Oit,pop_status> 
-      wait_for_and_pop_n(Oit out, 
-            const std::chrono::duration<Rep, Period>& dur,
-            difference_type count)
+      wait_for_and_pop_n(Oit out, difference_type count, 
+            const std::chrono::duration<Rep, Period>& dur)
       {
          std::unique_lock ul{m_mut};
          if(m_interrupt_waiting)
@@ -187,7 +186,7 @@ namespace ts_adv{
             return pop_status::interrupted;
          bool status = m_cb.wait_until(ul, tp,
                            [this](){
-                              return !m_stack.empty||
+                              return !m_stack.empty()||
                               m_interrupt_waiting;
                            });
          if(!status)
@@ -203,9 +202,8 @@ namespace ts_adv{
          typename difference_type=
             typename std::iterator_traits<Oit>::difference_type>
       std::pair<Oit,pop_status> 
-      wait_until_and_pop_n(Oit out, 
-            std::chrono::time_point<Clock,Dur> tp,
-                             difference_type count)
+      wait_until_and_pop_n(Oit out, difference_type count, 
+            std::chrono::time_point<Clock,Dur> tp)
       {
          std::unique_lock ul{m_mut};
          if(m_interrupt_waiting)return {out,pop_status::interrupted};
