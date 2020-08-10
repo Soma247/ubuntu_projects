@@ -79,16 +79,12 @@ namespace ts_adv{
             m_head=std::move(m_head->m_next);//destruct in reset with data
          }
       }
-      void clear(){
-         std::scoped_lock sl(m_head_mut, m_tail_mut);
-         this->clear_unprotected();
-      }
       node* get_tail_protected()const{
          std::lock_guard lg{m_tail_mut};
          return m_tail;
       }
       
-      void pop_unptotected_unchecked(value_type& ret){
+      void pop_unprotected_unchecked(value_type& ret){
          ret=std::move(*m_head->get_data_addr());//move item from head
          m_head=std::move(m_head->m_next);
       }
@@ -98,7 +94,7 @@ namespace ts_adv{
       {
          if(m_head.get()==possible_tail)
             return pop_status::empty;
-         this->pop_unptotected_unchecked(ret);
+         this->pop_unprotected_unchecked(ret);
          return pop_status::ready;
       }
 
@@ -109,11 +105,12 @@ namespace ts_adv{
             difference_type count, node* possible_tail)
       {
          for(; count; ++out, --count){
-            if(m_head.get==possible_tail)//check empty possibility
+            if(m_head.get()==possible_tail)//check empty possibility
                return out;
-            *out=std::move(m_head->get_data_ref());
-            m_head=std::move(m_head->next);
+            *out=std::move(*m_head->get_data_addr());
+            m_head=std::move(m_head->m_next);
          }
+         return out;
       } 
 
    public:
@@ -146,6 +143,11 @@ namespace ts_adv{
          return *this;
       }
 
+      void clear(){
+         std::scoped_lock sl(m_head_mut, m_tail_mut);
+         this->clear_unprotected();
+      }
+
       pop_status pop(value_type& ret){
          std::lock_guard lg{m_head_mut};
          return pop_unprotected(ret,this->get_tail_protected());
@@ -167,7 +169,7 @@ namespace ts_adv{
          m_cb.wait(ul,
                [this](){
                //update tail, check for empty & interrupt
-                  return m_head.get !=
+                  return m_head.get() !=
                     this->get_tail_protected() || 
                         m_interrupt_waiting;
                }
@@ -175,7 +177,8 @@ namespace ts_adv{
          if(m_interrupt_waiting)
             return pop_status::interrupted;
          //queue isn't empty here
-         return this->pop_unprotected_unchecked(ret);
+         this->pop_unprotected_unchecked(ret);
+         return pop_status::ready;
       }
       template <typename Oit, 
          typename difference_type=
@@ -202,10 +205,10 @@ namespace ts_adv{
          std::unique_lock ul{m_head_mut};
          if(m_interrupt_waiting)
             return pop_status::interrupted;
-         bool status=m_cb.wait(ul, dur,
+         bool status=m_cb.wait_for(ul, dur,
                         [this](){
                         //update tail, check for empty & interrupt
-                           return m_head.get !=
+                           return m_head.get() !=
                               this->get_tail_protected() || 
                                  m_interrupt_waiting;
                         }
@@ -214,21 +217,21 @@ namespace ts_adv{
          if(m_interrupt_waiting)
             return pop_status::interrupted;
          //queue isn't empty here
-         return this->pop_unprotected_unchecked(ret);
+         this->pop_unprotected_unchecked(ret);
+         return pop_status::ready;
       }
 
       template <typename Rep, typename Period, typename Oit, 
          typename difference_type=
             typename std::iterator_traits<Oit>::difference_type>
       std::pair<Oit,pop_status> 
-      wait_for_and_pop_n(Oit out, 
-            const std::chrono::duration<Rep, Period>& dur,
-            difference_type count)
+      wait_for_and_pop_n(Oit out, difference_type count, 
+            const std::chrono::duration<Rep, Period>& dur)
       {
          std::unique_lock ul{m_head_mut};
-         if(m_interrupt_waiting)return out;
+         if(m_interrupt_waiting)return {out, pop_status::interrupted};
          node* possible_tail{nullptr};
-         bool status=m_cb.wait(ul, dur,
+         bool status=m_cb.wait_for(ul, dur,
                [this,&possible_tail](){
                   return m_head.get()!=
                      (possible_tail=this->get_tail_protected()) ||
@@ -249,10 +252,10 @@ namespace ts_adv{
          std::unique_lock ul{m_head_mut};
          if(m_interrupt_waiting)
             return pop_status::interrupted;
-         bool status=m_cb.wait(ul, tp,
+         bool status=m_cb.wait_until(ul, tp,
                         [this](){
                         //update tail, check for empty & interrupt
-                           return m_head.get !=
+                           return m_head.get() !=
                               this->get_tail_protected() || 
                                  m_interrupt_waiting;
                         }
@@ -261,21 +264,21 @@ namespace ts_adv{
          if(m_interrupt_waiting)
             return pop_status::interrupted;
          //queue isn't empty here
-         return this->pop_unprotected_unchecked(ret);
+         this->pop_unprotected_unchecked(ret);
+         return pop_status::ready;
       }
 
       template <typename Clock, typename Dur, typename Oit, 
          typename difference_type=
             typename std::iterator_traits<Oit>::difference_type>
       std::pair<Oit,pop_status> 
-      wait_until_and_pop_n(Oit out, 
-            std::chrono::time_point<Clock,Dur> tp,
-                             difference_type count)
+      wait_until_and_pop_n(Oit out, difference_type count,
+            std::chrono::time_point<Clock,Dur> tp)
       {
          std::unique_lock ul{m_head_mut};
-         if(m_interrupt_waiting)return out;
+         if(m_interrupt_waiting)return {out,pop_status::interrupted};
          node* possible_tail{nullptr};
-         bool status=m_cb.wait(ul, tp,
+         bool status=m_cb.wait_until(ul, tp,
                [this,&possible_tail](){
                   return m_head.get()!=
                      (possible_tail=this->get_tail_protected()) ||
@@ -354,7 +357,7 @@ namespace ts_adv{
 
          for(; it!=end; ++it){
             tail_sub->construct_data(*it);
-            tail_sub->next=std::make_unique<node>();
+            tail_sub->m_next=std::make_unique<node>();
             tail_sub=tail_sub->m_next.get();
          }
          
@@ -362,7 +365,7 @@ namespace ts_adv{
          
          //append subqueue to list of nodes
          m_tail->construct_data(*beg);//insert first elem to tail_node
-         m_tail->next=std::move(head_sub);//append subseq
+         m_tail->m_next=std::move(head_sub);//append subseq
          m_tail=tail_sub;//set tail ptr to tail of subseq
       }
       template<typename InIt>
