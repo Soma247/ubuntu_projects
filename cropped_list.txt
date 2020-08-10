@@ -33,3 +33,4 @@ tcl
 tk
 valgrind
 vim
+cxxtest

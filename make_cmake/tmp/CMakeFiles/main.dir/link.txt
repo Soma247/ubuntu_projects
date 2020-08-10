@@ -1,0 +1,1 @@
+clang++   -pedantic -mcx16 -stdlib=libc++ -std=c++17   -lc++abi -lpthread -rdynamic CMakeFiles/main.dir/main.cpp.o  -o main 

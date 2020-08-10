@@ -1,0 +1,3 @@
+/home/nean/Desktop/projects/make_cmake/tmp/CMakeFiles/rebuild_cache.dir
+/home/nean/Desktop/projects/make_cmake/tmp/CMakeFiles/edit_cache.dir
+/home/nean/Desktop/projects/make_cmake/tmp/CMakeFiles/main.dir
