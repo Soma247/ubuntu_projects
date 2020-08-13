@@ -177,7 +177,8 @@ namespace ts_adv{
          }
          template<typename M>
          void insert_or_assign(key_type&& k, M&& obj){
-            bucket_for(k).insert_or_assign(std::move(k),
+            auto& bckt = bucket_for(k);
+            bckt.insert_or_assign(std::move(k),
                               std::forward<M>(obj));
          }
 
@@ -189,7 +190,8 @@ namespace ts_adv{
 
          template<typename M>
          bool insert(key_type&& k, M&& obj){
-            return bucket_for(k).insert(std::move(k),
+            auto& bckt = bucket_for(k);
+            return bckt.insert(std::move(k),
                                        std::forward<M>(obj));
 
          }

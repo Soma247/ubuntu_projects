@@ -43,7 +43,7 @@ namespace ts_adv{
       
       void push_node_front(std::unique_ptr<node_type> new_beg){
          std::lock_guard lg{m_before_begin->m_mut};
-         new_beg.m_next=std::move(m_before_begin->m_text);
+         new_beg->m_next=std::move(m_before_begin->m_next);
          m_before_begin->m_next=std::move(new_beg);
       }
 
@@ -128,6 +128,12 @@ namespace ts_adv{
          }
       }
 
+      bool empty()const{
+         std::lock_guard lg{m_before_begin->m_mut};
+         if(m_before_begin->m_next)
+            return false;
+         return true;
+      }
       template<typename UnPred>
       void remove_if(UnPred p){
          static_assert(std::is_invocable_r_v<bool, UnPred,
@@ -154,6 +160,38 @@ namespace ts_adv{
                prev_lock=std::move(cur_lock);
             }
          }
+      }
+      template<typename UnPred>
+      bool remove_first_if(UnPred p){
+         static_assert(std::is_invocable_r_v<bool, UnPred,
+               std::shared_ptr<T>>, "unary predicate must expect"
+               "shared_ptr<T> and return "
+               "bool-convertible result\n");
+         //m_before_begin.get() can't change
+         node_type* prev_cptr = m_before_begin.get();
+         std::unique_lock prev_lock {prev_cptr->m_mut};
+         while(prev_cptr->m_next){
+            //prev_cptr->m_next.get() under prev mutex lock
+            node_type* cur_cptr = prev_cptr->m_next.get();
+            std::unique_lock cur_lock{cur_cptr->m_mut};
+            if(p(cur_cptr->m_pdata)){
+               //move current node outside a list, unlock it and delete
+               std::unique_ptr<node_type> tmp{std::move(prev_cptr->m_next)};
+               prev_cptr->m_next=std::move(tmp->m_next);
+               cur_lock.unlock();
+               return true;
+            }
+            else{
+               //go to next node
+               prev_lock.unlock();
+               prev_cptr = cur_cptr;
+               prev_lock=std::move(cur_lock);
+            }
+         }
+         return false;
+      }
+      void clear(){
+         this->remove_if([](auto){return true;});
       }
       ~tfg_flist(){}
 

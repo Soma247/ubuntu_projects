@@ -7,7 +7,6 @@ auto ready=ts_adv::ts_stack<long>::pop_status::ready;
 auto empty=ts_adv::ts_stack<long>::pop_status::empty;
 auto interrupted=ts_adv::ts_stack<long>::pop_status::interrupted;
 auto timeout=ts_adv::ts_stack<long>::pop_status::timeout;
-auto tri_lock_fail=ts_adv::ts_stack<long>::pop_status::try_lock_fail;
 
 class ts_stk_test_suite:public ::testing::Test{
 protected:
