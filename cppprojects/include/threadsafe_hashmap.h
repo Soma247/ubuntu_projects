@@ -88,27 +88,29 @@ namespace ts_adv{
          }
          
          template<typename M>
-         void insert_or_assign(const key_type& k, M&& m){
+         bool insert_or_assign(const key_type& k, M&& m){
             std::lock_guard lg{m_mut};
             iterator it=find_entry(k);
             if(it!=std::end(m_data)){
                it->second=std::forward<M>(m);
-               return;
+               return false;
             }
             m_data.push_front(bucket_value(k,
                                  std::forward<M>(m)));
+            return true;
          }
 
          template<typename M>
-         void insert_or_assign(key_type&& k, M&& m){
+         bool insert_or_assign(key_type&& k, M&& m){
             std::lock_guard lg{m_mut};
             iterator it=find_entry(k);
             if(it!=std::end(m_data)){
                it->second=std::forward<M>(m);
-               return;
+               return false;
             }
             m_data.push_front(bucket_value(std::move(k),
                                  std::forward<M>(m)));
+            return true;
          }
          template<typename M>
          bool insert(const key_type& k, M&& m){
@@ -171,14 +173,14 @@ namespace ts_adv{
          }
 
          template<typename M>
-         void insert_or_assign(const key_type& k, M&& obj){
-            bucket_for(k).insert_or_assign(k,
+         bool insert_or_assign(const key_type& k, M&& obj){//return is_inserted
+            return bucket_for(k).insert_or_assign(k,
                               std::forward<M>(obj));
          }
          template<typename M>
-         void insert_or_assign(key_type&& k, M&& obj){
+         bool insert_or_assign(key_type&& k, M&& obj){//return is_inserted
             auto& bckt = bucket_for(k);
-            bckt.insert_or_assign(std::move(k),
+            return bckt.insert_or_assign(std::move(k),
                               std::forward<M>(obj));
          }
 
