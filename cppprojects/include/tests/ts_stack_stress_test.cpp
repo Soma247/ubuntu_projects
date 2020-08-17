@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <chrono>
+#include <future>
 #include <atomic>
 #include <vector>
 #include <gtest/gtest.h>
@@ -25,6 +26,75 @@ void print(const std::string& str){
    std::lock_guard lg{mut};
    std::cout<<str<<std::endl;
 }*/
+TEST_F(ts_stk_test_suite, empty_pop_pop_test){
+   std::size_t count = 1000;
+   while(--count){
+      std::promise<void> pop1_rdy, pop2_rdy, start_operation;
+      std::shared_future<void> start {start_operation.get_future()};
+      m_stk.clear();
+      try{
+
+         decltype(m_stk)::pop_status status1{timeout}, status2{timeout};
+         auto popper_fun = [&](std::promise<void>& rdy,decltype(m_stk)::pop_status& status){
+            rdy.set_value();
+            start.wait();
+            long l{};
+            status = m_stk.pop(l);
+         };
+      
+         thread_adv::jointhread 
+               popper1(popper_fun, std::ref(pop1_rdy), std::ref(status1)),
+               popper2(popper_fun, std::ref(pop2_rdy), std::ref(status2));
+         pop1_rdy.get_future().wait();
+         pop2_rdy.get_future().wait();
+         start_operation.set_value();
+         popper1.join();
+         popper2.join();
+         ASSERT_TRUE(m_stk.empty());
+         ASSERT_EQ(status1, empty);
+         ASSERT_EQ(status2,empty);
+      }
+      catch(...){
+         start_operation.set_value();
+      }
+   }//while
+}
+TEST_F(ts_stk_test_suite, empty_push_pop_test){
+   std::size_t count = 1000;
+   while(--count){
+      std::promise<void> pusher_rdy, popper_rdy, start_operation;
+      std::shared_future<void> start {start_operation.get_future()};
+      m_stk.clear();
+      try{
+         thread_adv::jointhread pusher(
+            [&](){
+               pusher_rdy.set_value();
+               start.wait();
+               m_stk.push(3l);
+            }
+         );
+         decltype(m_stk)::pop_status status;
+         thread_adv::jointhread popper(
+            [&](){
+               popper_rdy.set_value();
+               start.wait();
+               long l{};
+               status = m_stk.pop(l);
+            }
+         );
+         pusher_rdy.get_future().wait();
+         popper_rdy.get_future().wait();
+         start_operation.set_value();
+         pusher.join();
+         popper.join();
+         ASSERT_TRUE(status==ready || !m_stk.empty());
+      }
+      catch(...){
+         start_operation.set_value();
+      }
+   }//while
+}
+
 TEST_F(ts_stk_test_suite, non_waiting_stress_test){
    std::size_t data_count{200'000};
    std::size_t range_size{500};
