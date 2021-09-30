@@ -86,6 +86,7 @@ NOTE: Pressing <ESC> will place you in Normal mode or will cancel an unwanted an
   :set nu (set nu!) - row numeration visibility
   :split vsplit - split window
   :bn bp Ctrl-w arrow change buffer in active window
+  :bd to delete buffer from list and close file
   :ls - get list of windows
   Cntrl-n open/close nerdtree, autocomplete
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

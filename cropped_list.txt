@@ -34,3 +34,4 @@ tk
 valgrind
 vim
 cxxtest
+libxcb-xinerama0

@@ -51,6 +51,7 @@
 #include <QtGui>
 
 #include "rasterwindow.h"
+#include <iostream>
 
 //! [5]
 class AnalogClockWindow : public RasterWindow
@@ -165,6 +166,6 @@ int main(int argc, char **argv)
 
     AnalogClockWindow clock;
     clock.show();
-
+    std::cout<<"abir"<<std::endl;
     return app.exec();
 }

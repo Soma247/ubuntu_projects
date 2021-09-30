@@ -173,7 +173,8 @@ try{
       });
       thread_adv::jointhread tr2([&tstack](){
          std::vector<int> vec{};
-         tstack.wait_until_and_pop_n(std::back_inserter(vec),std::chrono::steady_clock::now()+1s,5);
+         tstack.wait_until_and_pop_n(std::back_inserter(vec),5,
+               std::chrono::steady_clock::now()+1s);
          std::for_each(begin(vec),end(vec),&print<int&>);
       });
 
