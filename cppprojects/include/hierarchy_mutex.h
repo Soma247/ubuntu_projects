@@ -48,4 +48,4 @@ public:
    }
 };
 template<typename T>
-thread_local T hierarchy_mutex<T>::this_thread_h_{std::numeric_limits<std::size_t>::max()};
+thread_local T hierarchy_mutex<T>::this_thread_h_{std::numeric_limits<T>::max()};
