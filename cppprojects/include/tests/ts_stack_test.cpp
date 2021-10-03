@@ -113,9 +113,7 @@ using namespace std::chrono_literals;
 
 TEST_F(ts_stk_test_suite, push_and_notify_wait_and_pop_one_thread){
    auto pusher{[&](){
-      wait_push();
       m_stk.push_and_notify_one(1);
-      wait_push();
       m_stk.push_and_notify_one(2);
    }};
 
@@ -123,13 +121,10 @@ TEST_F(ts_stk_test_suite, push_and_notify_wait_and_pop_one_thread){
       long tmp{};
       auto status = m_stk.wait_and_pop(tmp);
       ASSERT_EQ(status,ready);
-      ASSERT_EQ(tmp,1);
+      ASSERT_EQ(tmp,2);
       status = m_stk.wait_and_pop(tmp);
       ASSERT_EQ(status,ready);
-      ASSERT_EQ(tmp,2);
-      status = m_stk.wait_and_pop(tmp);
-      ASSERT_EQ(status,interrupted);
-      ASSERT_EQ(tmp,2);
+      ASSERT_EQ(tmp,1);
    }};
    pusher();
    poper();
@@ -189,10 +184,7 @@ TEST_F(ts_stk_test_suite, push_and_notify_wait_for_and_pop_one_thread){
    const auto dur = 1ns;
 
    auto pusher{[&](){
-      wait_push();
       m_stk.push_and_notify_one(1);
-      std::this_thread::sleep_for(1ms);
-      wait_push();
       m_stk.push_and_notify_one(2);
    }};
 
@@ -202,15 +194,14 @@ TEST_F(ts_stk_test_suite, push_and_notify_wait_for_and_pop_one_thread){
       while(timeout == (status=m_stk.wait_for_and_pop(tmp,dur)))
          std::this_thread::yield();
       ASSERT_EQ(status,ready);
-      ASSERT_EQ(tmp,1);
-      std::this_thread::sleep_for(1ms);
+      ASSERT_EQ(tmp,2);
       while(timeout == (status=m_stk.wait_for_and_pop(tmp,dur)))
          std::this_thread::yield();
       ASSERT_EQ(status,ready);
-      ASSERT_EQ(tmp,2);
+      ASSERT_EQ(tmp,1);
       status = m_stk.wait_for_and_pop(tmp,dur);
       ASSERT_EQ(status,timeout);
-      ASSERT_EQ(tmp,2);
+      ASSERT_EQ(tmp,1);
    }};
    pusher();
    poper();
@@ -267,9 +258,7 @@ TEST_F(ts_stk_test_suite, push_and_notify_wait_until_and_pop_one_thread){
    const auto dur = 1ns;
 
    auto pusher{[&](){
-      wait_push();
       m_stk.push_and_notify_one(1);
-      wait_push();
       m_stk.push_and_notify_one(2);
    }};
 
@@ -281,15 +270,15 @@ TEST_F(ts_stk_test_suite, push_and_notify_wait_until_and_pop_one_thread){
                   m_stk.wait_until_and_pop(tmp, clock::now()+dur)))
          std::this_thread::yield();
       ASSERT_EQ(status, ready);
-      ASSERT_EQ(tmp, 1);
+      ASSERT_EQ(tmp, 2);
       while(timeout == (status =
                m_stk.wait_until_and_pop(tmp, clock::now()+dur)))
          std::this_thread::yield();
       ASSERT_EQ(status, ready);
-      ASSERT_EQ(tmp, 2);
+      ASSERT_EQ(tmp, 1);
       status = m_stk.wait_until_and_pop(tmp, clock::now()+dur);
       ASSERT_EQ(status, timeout);
-      ASSERT_EQ(tmp, 2);
+      ASSERT_EQ(tmp, 1);
    }};
    pusher();
    poper();
@@ -350,7 +339,6 @@ TEST_F(ts_stk_test_suite, push_range_and_notify_one_wait_and_pop_n_one_thread){
    auto pusher{[&](){;
       auto end {std::next(std::begin(source_arr),lower_dist)};
       m_stk.push_range_and_notify_one(std::begin(source_arr),end);
-      m_stk.push_range_and_notify_one(end,std::end(source_arr));
    }};
 
    auto poper{[&](){
@@ -358,21 +346,8 @@ TEST_F(ts_stk_test_suite, push_range_and_notify_one_wait_and_pop_n_one_thread){
       auto dest_end = m_stk.wait_and_pop_n(
                         std::begin(dest_arr),lower_dist);
       ASSERT_EQ(dest_end,std::next(std::begin(dest_arr),lower_dist));
-      //pushed 2, pop 9
-      dest_end = m_stk.wait_and_pop_n(dest_end,higher_dist);
-      ASSERT_EQ(dest_end,std::end(dest_arr));
-      ASSERT_TRUE(m_stk.empty());
-      std::sort(std::begin(dest_arr),std::end(dest_arr));
-      ASSERT_TRUE(std::equal(
-                  std::begin(source_arr),std::end(source_arr),
-                  std::begin(dest_arr),std::end(dest_arr)));
-      //push 0, wait to interrupt
-      dest_end = m_stk.wait_and_pop_n(std::begin(dest_arr),higher_dist);
-      ASSERT_EQ(dest_end,std::begin(dest_arr));
-      ASSERT_TRUE(m_stk.empty());
    }};
    pusher();
-   m_stk.stop_waitings();
    poper();
 }
 
@@ -479,8 +454,8 @@ TEST_F(ts_stk_test_suite, push_range_and_notify_one_wait_for_and_pop_n_one_threa
       ASSERT_TRUE(m_stk.empty());
       ASSERT_EQ(status,timeout);
     }};
-   pusher.join();
-   poper.join();
+   pusher();
+   poper();
 }
 
 TEST_F(ts_stk_test_suite, push_range_and_notify_one_wait_for_and_pop_n){
@@ -595,9 +570,9 @@ TEST_F(ts_stk_test_suite, push_range_and_notify_one_wait_until_and_pop_n_one_thr
       ASSERT_EQ(dest_end,std::begin(dest_arr));
       ASSERT_TRUE(m_stk.empty());
       ASSERT_EQ(status,timeout);
-   });
-   pusher.join();
-   poper.join();
+   }};
+   pusher();
+   poper();
 }
 
 
@@ -671,7 +646,6 @@ TEST_F(ts_stk_test_suite, push_range_and_notify_one_wait_until_and_pop_n){
 TEST_F(ts_stk_test_suite, non_waiting_stress_test){
    std::size_t data_count{500'000};
    std::size_t range_size{500};
-   std::size_t ranges_count{data_count/range_size};
    std::atomic<size_t> pushed{0};
    std::atomic<size_t> popped{0};
    std::atomic<bool> stop{false};

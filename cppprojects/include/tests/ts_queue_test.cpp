@@ -111,12 +111,8 @@ TEST_F(ts_queue_test_suite, push_and_notify_one_wait_and_pop_one_thread){
       status = m_queue.wait_and_pop(tmp);
       ASSERT_EQ(status,ready);
       ASSERT_EQ(tmp,2);
-      status = m_queue.wait_and_pop(tmp);
-      ASSERT_EQ(status,interrupted);
-      ASSERT_EQ(tmp,2);
    }};
    pusher();
-   m_queue.stop_waitings();
    poper();
    ASSERT_TRUE(m_queue.empty());
 }
@@ -270,7 +266,7 @@ TEST_F(ts_queue_test_suite, push_and_notify_one_wait_until_and_pop_one_thread){
       status = m_queue.wait_until_and_pop(tmp,clock::now()+dur);
       ASSERT_EQ(status,timeout);
       ASSERT_EQ(tmp,2);
-   });
+   }};
    pusher();
    poper();
    ASSERT_TRUE(m_queue.empty());
@@ -328,9 +324,7 @@ TEST_F(ts_queue_test_suite, push_range_and_notify_one_wait_and_pop_n_one_thread)
    std::array<long,5> source_arr{0,1,2,3,4}, dest_arr{};
  
    auto pusher{[&](){;
-      auto end {std::next(std::begin(source_arr),lower_dist)};
-      m_queue.push_range_and_notify_one(std::begin(source_arr),end);
-      m_queue.push_range_and_notify_one(end,std::end(source_arr));
+      m_queue.push_range_and_notify_one(std::begin(source_arr),std::end(source_arr));
    }};
 
    auto poper{[&](){
@@ -338,21 +332,8 @@ TEST_F(ts_queue_test_suite, push_range_and_notify_one_wait_and_pop_n_one_thread)
       auto dest_end = m_queue.wait_and_pop_n(
                         std::begin(dest_arr),lower_dist);
       ASSERT_EQ(dest_end,std::next(std::begin(dest_arr),lower_dist));
-      //pushed 2, pop 9
-      dest_end = m_queue.wait_and_pop_n(dest_end,higher_dist);
-      ASSERT_EQ(dest_end,std::end(dest_arr));
-      ASSERT_TRUE(m_queue.empty());
-      std::sort(std::begin(dest_arr),std::end(dest_arr));
-      ASSERT_TRUE(std::equal(
-                  std::begin(source_arr),std::end(source_arr),
-                  std::begin(dest_arr),std::end(dest_arr)));
-      //push 0, wait to interrupt
-      dest_end = m_queue.wait_and_pop_n(std::begin(dest_arr),higher_dist);
-      ASSERT_EQ(dest_end,std::begin(dest_arr));
-      ASSERT_TRUE(m_queue.empty());
    }};
    pusher();
-   m_queue.stop_waitings();
    poper();
 }
 
@@ -419,7 +400,7 @@ TEST_F(ts_queue_test_suite, push_range_and_notify_one_wait_for_and_pop_n_one_thr
       auto end {std::next(std::begin(source_arr),lower_dist)};
       m_queue.push_range_and_notify_one(std::begin(source_arr),end);
       m_queue.push_range_and_notify_one(end,std::end(source_arr));
-   });
+   }};
 
    auto poper{[&](){
       using iterator = typename std::array<long,5>::iterator;
@@ -457,7 +438,7 @@ TEST_F(ts_queue_test_suite, push_range_and_notify_one_wait_for_and_pop_n_one_thr
       ASSERT_EQ(dest_end,std::begin(dest_arr));
       ASSERT_TRUE(m_queue.empty());
       ASSERT_EQ(status,timeout);
-   });
+   }};
    pusher();
    poper();
 }
@@ -576,7 +557,7 @@ TEST_F(ts_queue_test_suite, push_range_and_notify_one_wait_until_and_pop_n_one_t
       ASSERT_EQ(dest_end,std::begin(dest_arr));
       ASSERT_TRUE(m_queue.empty());
       ASSERT_EQ(status,timeout);
-   });
+   }};
    pusher();
    poper();
 }
