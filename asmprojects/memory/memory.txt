@@ -1,0 +1,6 @@
+ah/al - 8 bit, 1 byte db
+ax - 16 bit, 2 bytes, 1 word dw
+eax - 32 bit, 4 bytes, 2 words dd
+rax - 64 bit, 8 bytes, 4 words dq
+
+if commands like "mov [someptr], register or register, [someptr]", size of object consider as size of register  mov rax, *((qwordptr*)someptr)
