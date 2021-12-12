@@ -1,0 +1,9 @@
+gdb -args exefilename arg1 arg2...
+b main
+i r rdi rsi rsp
+addr in rsi is ptr to *char array (byte *argv[])
+next adr in rsi+8(byte)
+rsi 0x7fffffffde80
+x/xs 0x7fffffffde80 ->0x7fffffffe204
+x/s 0x7fffffffe204 ->~/.../exefilename (first arg)
+x/xs 0x7fffffffde80+8 -> next ptr to char array with next arg

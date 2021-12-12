@@ -169,7 +169,7 @@ readFile:
    mov byte[rsi+rax], 0; end of char sequence
    mov rax, rsi; ptr to buffer in rax
    mov rdi, success_rd; success code in rdi
-   push rax; caller-saving register
+   push rax; caller-saved register
    call printString
    pop rax
    ret
@@ -271,7 +271,7 @@ closeerror:
 global createFile
 createFile:
    mov rax, NR_CREATE
-   mov rsi, S_IRUSR|S_IWUSR
+   mov rsi, S_IRUSR|S_IWUSR; access mode flags: rw for owner
    syscall
    cmp rax, 0 ; FD in rax if creating is success
    jl createerror
