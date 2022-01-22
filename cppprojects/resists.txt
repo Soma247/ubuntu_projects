@@ -1,0 +1,36 @@
+1.5d(1-rf)<d(1-(1-x)re);fire dps < explosive
+1.5 - 1.5rf< 1+re(x-1);
+0.5 - 1.5rf<re(x-1);
+re>(0.5-1.5rf)/(x-1);
+re>(1.5rf-0.5)/(1-x);
+
+x=50%
+
+re>(3rf-1);
+
+x=70%
+re>(4.5rf-1.5);
+
+all DED       30% all
+storm 44 65
+fire explosive:
+domovik vedmak 48 36
+
+scilla       50% all
+
+lancers      10% all
+sleeper frigs 0% all
+
+lit tessela  20 50
+angels       35 10 
+elite angels 40 15
+elite dram 58 50
+
+50% lansers, frigs fire, augs(hammer, if can live)
+50% trigs nova, t2 valki
+50% little drones fire, augs hammers/valk
+
+
+
+
+50% angels and trigs - t2 best, than aug

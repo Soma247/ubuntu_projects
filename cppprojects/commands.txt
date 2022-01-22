@@ -11,3 +11,4 @@
    test.o //name of file
 && ./test.o
 
+-L"./gtestlibcxx/" -lgtest -lgtest_main//for gtests

@@ -1,0 +1,1 @@
+ls |grep -P "^[^.]*$" | xargs -d "\n" rm -r
