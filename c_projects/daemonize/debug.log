@@ -1,0 +1,49 @@
+started
+umask, sigmask
+forked
+sighup ign
+forked2
+chdir
+fd closed, stdio fds is /dev/null
+started
+umask, sigmask
+forked
+sighup ign
+forked2
+chdir
+fd closed, stdio fds is /dev/null
+started
+umask, sigmask
+forked
+sighup ign
+forked2
+chdir
+fd closed, stdio fds is /dev/null
+started
+umask, sigmask
+forked
+sighup ign
+forked2
+chdir
+fd closed, stdio fds is /dev/null
+started
+umask, sigmask
+forked
+sighup ign
+forked2
+chdir
+fd closed, stdio fds is /dev/null
+started
+umask, sigmask
+forked
+sighup ign
+forked2
+chdir
+started
+umask, sigmask
+forked
+sighup ign
+forked2
+chdir
+fd closed, stdio fds is /dev/null
+fd closed, stdio fds is /dev/null
