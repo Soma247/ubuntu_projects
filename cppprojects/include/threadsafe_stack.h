@@ -54,7 +54,7 @@ namespace ts_adv{
       }
 
       void pop_unprotected(value_type& ret){
-         ret=std::move(m_stack.top());
+         ret=std::move(m_stack.top());//if noexcept?
          m_stack.pop();
       }
 
