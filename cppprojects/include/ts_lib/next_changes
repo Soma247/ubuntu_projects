@@ -1,0 +1,2 @@
+1) think about move_if_noexcept in push_n and pop_n
+2) comment that if objects throw_move/copy_assignable, in waiting pops and pushs maybe need notify another waiting thread after catch the exception or try pop in again(object still in container, but noone is notified)
